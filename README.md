@@ -27,10 +27,10 @@ Sometimes I would find that I might want to know the source directory of where I
     - [x] `--multiline` - show entire multi-line commands
     - [x] `--startpath` - start the search at a specific path: `~/.directory_history/home/myuid/src/`
       - specified as `/home/myuid/src`
-    - [ ] `--searchfrom` - timeframe in 4d, 3w, 2m, 1y
-    - [ ] `--searchduration` - timeframe in 1d, 1w, 1m, 1y, starting from `--searchfrom`
+    - [x] `--searchfrom` - timeframe in 4d, 3w, 2m, 1y
+    - [x] `--searchduration` - timeframe in 1d, 1w, 1m, 1y, starting from `--searchfrom`
       - defaults to `--searchfrom`
-    - [ ] `--terse`
+    - [x] `--terse`
     - [ ] `--verbose`
     - [ ] `--fields` - csv list of field names `"date,directory,command"`
     - [ ] `--output` - json,table,text,yaml?
