@@ -37,6 +37,7 @@ var startpath string
 var searchfrom string
 var searchduration string
 var terse bool
+var context int
 
 const (
 	forward  = 1
@@ -65,6 +66,7 @@ search-directory-history search "statefulset | configmap | deployment"
 		var baseDir string
 		multiline, _ = cmd.Flags().GetBool("multiline")
 		terse, _ = cmd.Flags().GetBool("terse")
+		context, _ = cmd.Flags().GetInt("context")
 		if len(os.Getenv("HISTORY_BASE")) > 0 {
 			baseDir = os.Getenv("HISTORY_BASE")
 		} else {
@@ -89,7 +91,6 @@ search-directory-history search "statefulset | configmap | deployment"
 		searchfrom, _ = cmd.Flags().GetString("searchfrom")
 		searchduration, _ = cmd.Flags().GetString("searchduration")
 		searchString = args[0]
-		// TODO: add specifier to directory_history location, also self-detection
 		filepath.Walk(searchPath, parseDirectoryHistory)
 	},
 }
@@ -132,7 +133,6 @@ func getDurationDate(duration string, timeStart time.Time, direction int) time.T
 	yearAdjust = 0
 	monthAdjust = 0
 	dayAdjust = 0
-	//orig := duration
 	for duration != "" {
 
 		var value int
@@ -143,7 +143,6 @@ func getDurationDate(duration string, timeStart time.Time, direction int) time.T
 			return time.Now().AddDate(-5, 0, 0)
 		}
 		// Consume [0-9]*
-		//pl := len(duration)
 		value, duration, err = leadingInt(duration)
 		if err != nil {
 			// return our default of -5 years
@@ -183,6 +182,7 @@ func getDurationDate(duration string, timeStart time.Time, direction int) time.T
 
 func parseDirectoryHistory(path string, f os.FileInfo, err error) error {
 	var histLines []string
+	var contextLookup []string
 	if strings.HasSuffix(path, "history") {
 		f, err := os.Open(path)
 		if err != nil {
@@ -203,7 +203,10 @@ func parseDirectoryHistory(path string, f os.FileInfo, err error) error {
 		var multilineAdded bool
 		var displayCmd string
 		var plainCmd string
+		var haveMatch bool
+		var afterMatchCount int
 		hashes := make(map[string]string)
+		haveMatch = false
 		for scanner.Scan() {
 			var cmdstart = strings.Index(scanner.Text(), ":")
 			if cmdstart == 0 {
@@ -231,17 +234,48 @@ func parseDirectoryHistory(path string, f os.FileInfo, err error) error {
 					hashes[fmt.Sprintf("%x", hash.Sum(nil))] = fmt.Sprintf("%x", hash.Sum(nil))
 					//if strings.Contains(scanner.Text(), searchString) {
 					if basicSearch(searchString, scanner.Text()) {
-						if multiline && !multilineAdded {
-							for _, cmdline := range cmdLines {
-								histLines = append(histLines, cmdline)
-							}
-							multilineAdded = true
+						if context > 0 {
+							haveMatch = true
+							afterMatchCount = 0
+							contextLookup = append(contextLookup, fmt.Sprintf("=%s", displayCmd))
 						} else {
-							histLines = append(histLines, displayCmd)
+							if multiline && !multilineAdded {
+								for _, cmdline := range cmdLines {
+									histLines = append(histLines, cmdline)
+								}
+								multilineAdded = true
+							} else {
+								histLines = append(histLines, displayCmd)
+							}
+						}
+					} else {
+						if context > 0 {
+							if haveMatch {
+								if afterMatchCount >= context {
+									for _, cmdline := range contextLookup {
+										histLines = append(histLines, cmdline)
+									}
+									haveMatch = false
+									afterMatchCount = 0
+								} else {
+									contextLookup = append(contextLookup, fmt.Sprintf("-%s", displayCmd))
+									afterMatchCount++
+								}
+							} else {
+								contextLookup = append(contextLookup, fmt.Sprintf("+%s", displayCmd))
+								if len(contextLookup) > context {
+									contextLookup = contextLookup[2:]
+								}
+							}
 						}
 					}
 					line++
 				}
+			}
+		}
+		if haveMatch && len(contextLookup) > 0 {
+			for _, cmdline := range contextLookup {
+				histLines = append(histLines, cmdline)
 			}
 		}
 
@@ -311,4 +345,5 @@ func init() {
 	searchCmd.Flags().String("startpath", "/", "Specify a starting relative path to start the search under")
 	searchCmd.Flags().String("searchfrom", "5y", "Specify how far back to search, in y,m,w,d")
 	searchCmd.Flags().String("searchduration", "5y", "Specify duration to search from 'searchfrom', in y,m,w,d.  Defaults to 'searchfrom' value.")
+	searchCmd.Flags().Int("context", 0, "How many lines on each side of match to display")
 }
