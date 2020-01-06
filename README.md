@@ -31,8 +31,12 @@ Sometimes I would find that I might want to know the source directory of where I
     - [x] `--searchduration` - timeframe in 1d, 1w, 1m, 1y, starting from `--searchfrom`
       - defaults to `--searchfrom`
     - [x] `--terse`
+    - [ ] `--context` - number of context commands to display on either side of match
+      - for troubleshooting/identification of context lines, a -/=/+ was used to indicate
+      - if a command comes before (-), is the match (=), or is after (+)
+      - [x] basic functionality is working, would like to make it work more like diff with context
+    - [ ] command line completions, looks like Cobra framework has the ability to spit out completion scripts.
     - [ ] `--verbose`
     - [ ] `--fields` - csv list of field names `"date,directory,command"`
     - [ ] `--output` - json,table,text,yaml?
-    - [ ] `--context` - number of context commands to display on either side of match
 - help
