@@ -1,0 +1,115 @@
+#compdef search-directory-history
+
+local state
+
+_arguments \
+  'help[help on any command]:helpcommand:->helpcommand' \
+  'search[search for text]:searchcommand:->searchcommand' \
+  '--help[help]:helpsystem:->helpsystem' \
+  '--multiline[show multiline command contents]:multilineoption:->multilineoption' \
+  '--terse[terse output]:terseoption:->terseoption' \
+  '--pathstart[path to start the search from]:pathstart:->pathstart' \
+  '-r[AWS Region / Azure Location]:region:->region' \
+  '-s[Azure Subscription Id]:azsubscription:->azsubscription' \
+
+case "$state" in
+    (helpcommand)
+    ;;
+    (searchcommand)
+    ;;
+    (helpsystem)
+    ;;
+    (multilineoption)
+    ;;
+    (terseoption)
+    ;;
+    (pathstart)
+        _values 'pathstart' $(find ~/.directory_history/* -type d | sed "s:^${HOME}/.directory_history::")
+    ;;
+    (environmentname)
+        if ! [ -d ~/.splicecompletions ]; then
+            mkdir ~/.splicecompletions
+        fi
+        if ! [ -f ~/.splicecompletions/environments ]; then
+            az keyvault secret list --vault-name dcos-keys | jq -r ".[].tags.environment" | sort -u | grep -v null > ~/.splicecompletions/environments
+        else
+            if [ $(( $(date +%s) - $(date -r ~/.splicecompletions/environments +%s) )) -gt 1800 ]; then
+                az keyvault secret list --vault-name dcos-keys | jq -r ".[].tags.environment" | sort -u | grep -v null > ~/.splicecompletions/environments
+            fi
+        fi
+        _values 'environmentname' $(cat ~/.splicecompletions/environments)
+    ;;
+    (awscredential)
+        _values 'awscredential' $(sed -n -E "s/\[([a-zA-Z0-9_\-]+)\]/\1/p" ~/.aws/credentials | tr \\n " ")
+    ;;
+    (region)
+        if ! [ -d ~/.splicecompletions ]; then
+            mkdir ~/.splicecompletions
+        fi
+        if ! [ -f ~/.splicecompletions/awsregions ]; then
+            aws ec2 describe-regions | jq -r ".Regions[].RegionName" | sort > ~/.splicecompletions/awsregions
+        else
+            if [ $(( $(date +%s) - $(date -r ~/.splicecompletions/awsregions +%s) )) -gt 1800 ]; then
+                aws ec2 describe-regions | jq -r ".Regions[].RegionName" | sort > ~/.splicecompletions/awsregions
+            fi
+        fi
+        if ! [ -f ~/.splicecompletions/azregions ]; then
+            az account list-locations | jq -r ".[].name" | sort > ~/.splicecompletions/azregions
+        else
+            if [ $(( $(date +%s) - $(date -r ~/.splicecompletions/azregions +%s) )) -gt 1800 ]; then
+                az account list-locations | jq -r ".[].name" | sort > ~/.splicecompletions/azregions
+            fi
+        fi
+        local -i index=${words[(I)-c]}
+        local -i ret=0
+        if ((index == 0)); then
+            _values 'region' "specify -c option first"
+            ret=$?
+        elif [[ "$words[index+1]" == "aws" ]]; then
+            _values 'region' $(cat ~/.splicecompletions/awsregions)
+            ret=$?
+        elif [[ "$words[index+1]" == "az" ]]; then
+            _values 'regsion' $(cat ~/.splicecompletions/azregions)
+            ret=$?
+        fi
+        return ret
+    ;;
+    (azsubscription)
+        if ! [ -d ~/.splicecompletions ]; then
+            mkdir ~/.splicecompletions
+        fi
+        if ! [ -f ~/.splicecompletions/azsubscriptions ]; then
+            az account list | jq -r ".[].id" > ~/.splicecompletions/azsubscriptions
+        else
+            if [ $(( $(date +%s) - $(date -r ~/.splicecompletions/azsubscriptions +%s) )) -gt 1800 ]; then
+                az account list | jq -r ".[].id" > ~/.splicecompletions/azsubscriptions
+            fi
+        fi
+        _values 'azsubscription' $(cat ~/.splicecompletions/azsubscriptions)
+    ;;
+    (dcosurl)
+        local -i index=${words[(I)-c]}
+        local -i envindex=${words[(I)-e]}
+        local -i regindex=${words[(I)-r]}
+        local -i ret=0
+        if ((index == 0 || envindex == 0 || regindex == 0)); then
+            _values 'dcosurl' "specify -c,-e, and -r options first"
+            ret=$?
+        elif [[ "$words[index+1]" == "aws" ]]; then
+            if [[ "$words[envindex+1]" == "prod" ]]; then
+                _values 'dcosurl' "https://$words[regindex+1].splicemachine.io"
+            else
+                _values 'dcosurl' "https://$words[regindex+1].splicemachine-$words[envindex+1].io"
+            fi
+            ret=$?
+        elif [[ "$words[index+1]" == "az" ]]; then
+            if [[ "$words[envindex+1]" == "prod" ]]; then
+                _values 'dcosurl' "http:\/\/dcos-splice.$words[regindex+1].cloudapp.azure.com"
+            else
+                _values 'dcosurl' "http:\/\/dcos-splice-$words[envindex+1].$words[regindex+1].cloudapp.azure.com"
+            fi
+            ret=$?
+        fi
+        return ret
+    ;;
+esac
